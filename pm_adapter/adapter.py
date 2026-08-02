@@ -10,11 +10,10 @@ performs Hamming [8,4,4] error detection and correction.
 """
 
 import json
-import sys
+import logging
 from pathlib import Path
 
 _SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"
-_MORSE_ROOT = Path(__file__).resolve().parent.parent.parent / "morse"
 
 
 def load_schema(name: str) -> dict:
@@ -27,22 +26,12 @@ def load_schema(name: str) -> dict:
 
 
 def _import_failsafe():
-    """Import FailsafePM1 — try the pro_memoria package export first.
+    """Import FailsafePM1 from the pro-memoria package.
 
-    FailsafePM1 lives in the pro-memoria repo's root-level
-    ``opencode_plugin/failsafe.py``. Try the package attribute first (in case
-    a future pro-memoria version exports it), then fall back to the direct
-    path import with the repo root on sys.path.
+    Modules live inside ``pro_memoria/opencode_plugin/`` — no sys.path
+    manipulation or sibling-directory assumptions needed.
     """
-    try:
-        from pro_memoria import FailsafePM1
-        return FailsafePM1
-    except ImportError:
-        pass
-    root = str(_MORSE_ROOT)
-    if root not in sys.path:
-        sys.path.insert(0, root)
-    from opencode_plugin.failsafe import FailsafePM1
+    from pro_memoria.opencode_plugin.failsafe import FailsafePM1
     return FailsafePM1
 
 
@@ -61,7 +50,12 @@ class Adapter:
         return self._failsafe
 
     def _decode_bytes(self, frame: str) -> bytes:
-        """Return raw state bytes for a frame, honoring use_ecc."""
+        """Return raw state bytes for a frame, honoring use_ecc.
+
+        With use_ecc=True, Hamming [8,4,4] correction is transparent:
+        single-bit errors are corrected and the clean bytes returned (a
+        warning is logged). Only genuinely unrecoverable corruption raises.
+        """
         if not self.use_ecc:
             from pro_memoria import morse_to_bits, decode_bytes
             return decode_bytes(frame)
@@ -69,7 +63,17 @@ class Adapter:
         failsafe = self._get_failsafe()
         corrected_before = failsafe.total_corrected
         data = failsafe.decode(frame)
+        n_corrected = failsafe.total_corrected - corrected_before
+
         if data is None:
+            # Unrecoverable corruption (double-bit error) or invalid
+            # encoding. n_corrected is 0 on this path, but guard the
+            # corrected + uncorrectable combination defensively.
+            if n_corrected > 0:
+                raise ValueError(
+                    f"PM-1 ECC: {n_corrected} bit(s) corrected but frame still "
+                    f"unrecoverable (session={failsafe.session_id})"
+                )
             detail = "unrecoverable corruption (double-bit error)"
             if failsafe.last_error is not None:
                 err_type = failsafe.last_error.get("error_type", "unknown")
@@ -78,11 +82,12 @@ class Adapter:
             raise ValueError(
                 f"PM-1 ECC decode failed — {detail} (session={failsafe.session_id})"
             )
-        n_corrected = failsafe.total_corrected - corrected_before
+
         if n_corrected > 0:
-            raise ValueError(
-                f"PM-1 ECC detected and corrected {n_corrected} bit error(s) "
-                f"in frame (session={failsafe.session_id})"
+            # Single-bit error corrected transparently — return clean data.
+            logging.warning(
+                "PM-1 ECC corrected %d bit error(s) in frame (session=%s)",
+                n_corrected, failsafe.session_id,
             )
         return data
 
