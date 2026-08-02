@@ -1,0 +1,12 @@
+pyproject.toml
+pm_adapter/__init__.py
+pm_adapter/adapter.py
+pm_adapter/events.py
+pm_adapter/rag.py
+pm_adapter.egg-info/PKG-INFO
+pm_adapter.egg-info/SOURCES.txt
+pm_adapter.egg-info/dependency_links.txt
+pm_adapter.egg-info/entry_points.txt
+pm_adapter.egg-info/requires.txt
+pm_adapter.egg-info/top_level.txt
+tests/test_adapter.py

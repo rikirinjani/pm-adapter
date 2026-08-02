@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pm-adapter"
+version = "0.1.0"
+description = "Reference adapter for Pro Memoria — schema-driven PM-1 frame expansion"
+requires-python = ">=3.8"
+dependencies = ["pro-memoria"]
+
+[project.scripts]
+pm-adapter = "pm_adapter.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pm_adapter*"]

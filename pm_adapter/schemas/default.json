@@ -1,0 +1,14 @@
+{
+  "name": "default_agent_state",
+  "state_width": 8,
+  "fields": [
+    {"byte": 0, "name": "agent_type", "values": {"0": "orchestrator", "1": "fixer", "2": "oracle", "3": "explorer", "4": "librarian", "5": "designer"}},
+    {"byte": 1, "name": "phase", "values": {"0": "idle", "1": "think", "2": "act", "3": "handoff", "4": "review"}},
+    {"byte": 2, "name": "confidence", "values": {"0": "none", "1": "low", "2": "medium", "3": "high"}},
+    {"byte": 3, "name": "error_count", "values": {}},
+    {"byte": 4, "name": "tool_calls", "values": {}},
+    {"byte": 5, "name": "files_touched", "values": {}},
+    {"byte": 6, "name": "outcome", "values": {"0": "running", "1": "pass", "2": "fail", "3": "retry"}},
+    {"byte": 7, "name": "flags", "values": {}}
+  ]
+}
