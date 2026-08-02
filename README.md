@@ -1,16 +1,16 @@
 # PM-Adapter
 
-**Schema-driven PM-1 frame expansion.** Takes Pro Memoria (PM-1) Morse frames and expands them into human-readable English, structured JSON, RAG-optimized descriptions, and multi-agent coordinator compatible state change events.
+**Schema-driven PM-1 frame expansion.** Takes Pro Memoria (PM-1) Morse frames and expands them into human-readable English, structured JSON, semantic descriptions, and multi-agent coordinator compatible state change events.
 
 Zero LLM calls. Pure deterministic schema lookup. No part of PM-1 — consumes it.
 
 ## Install
 
 ```
-pip install pm-adapter
+pip install git+https://github.com/rikirinjani/pm-adapter.git
 ```
 
-Requires `pro-memoria`.
+Requires `pro-memoria`, installed automatically as a git dependency.
 
 ## Usage
 
@@ -30,8 +30,8 @@ print(adapter.to_english(frame))
 print(adapter.to_json(frame))
 # {"agent_type": "fixer", "phase": "act", ...}
 
-# RAG-optimized description
-print(adapter.to_rag(frame))
+# Semantic description
+print(adapter.to_semantic(frame))
 # "Agent state: agent type set to fixer, phase set to act..."
 
 # Multi-agent event bus events
@@ -45,7 +45,7 @@ print(adapter.to_events(frame))
 |------|--------|-----|
 | `to_english()` | Human-readable sentence | Debugging, human-facing dashboards |
 | `to_json()` | Structured dict | Programmatic consumption |
-| `to_rag()` | Dense searchable description | Vector embedding for semantic memory |
+| `to_semantic()` | Dense searchable description | Vector embedding for semantic memory |
 | `to_events()` | State change event list | Multi-agent event bus, deterministic scheduling |
 
 ## Why a separate adapter?
@@ -62,7 +62,7 @@ Adapter.decode(frame, schema)   ← deterministic schema lookup, zero LLM calls
      │
      ├── to_english()           ← human-readable
      ├── to_json()              ← structured dict
-     ├── to_rag()               ← vector-embeddable description
+     ├── to_semantic()          ← vector-embeddable description
      └── to_events()            ← coordinator-compatible state changes
 ```
 

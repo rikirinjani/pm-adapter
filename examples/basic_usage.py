@@ -12,5 +12,5 @@ frame = ".......-......-.......--...............................-........"
 
 print("to_english:", adapter.to_english(frame))
 print("to_json:", adapter.to_json(frame))
-print("to_rag:", adapter.to_rag(frame))
+print("to_semantic:", adapter.to_semantic(frame))
 print("to_events:", adapter.to_events(frame))

@@ -2,13 +2,19 @@
 
 Consumes Pro Memoria (PM-1) frames: decodes the raw Morse bit-string to
 bytes, then expands each byte through a user-supplied schema into four
-output modes (english, json, rag, events). Pure schema lookup, no LLM.
+output modes (english, json, semantic, events). Pure schema lookup, no LLM.
+
+ECC note: when use_ecc=False (default), the adapter assumes upstream has
+already validated the frame via FailsafePM1. When use_ecc=True, decode()
+performs Hamming [8,4,4] error detection and correction.
 """
 
 import json
+import sys
 from pathlib import Path
 
 _SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"
+_MORSE_ROOT = Path(__file__).resolve().parent.parent.parent / "morse"
 
 
 def load_schema(name: str) -> dict:
@@ -20,16 +26,74 @@ def load_schema(name: str) -> dict:
         return json.load(fh)
 
 
+def _import_failsafe():
+    """Import FailsafePM1 — try the pro_memoria package export first.
+
+    FailsafePM1 lives in the pro-memoria repo's root-level
+    ``opencode_plugin/failsafe.py``. Try the package attribute first (in case
+    a future pro-memoria version exports it), then fall back to the direct
+    path import with the repo root on sys.path.
+    """
+    try:
+        from pro_memoria import FailsafePM1
+        return FailsafePM1
+    except ImportError:
+        pass
+    root = str(_MORSE_ROOT)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from opencode_plugin.failsafe import FailsafePM1
+    return FailsafePM1
+
+
 class Adapter:
-    def __init__(self, schema: dict):
+    def __init__(self, schema: dict, use_ecc: bool = False):
         if schema is None:
             raise TypeError("schema is required")
         self.schema = schema  # {"state_width": 8, "fields": [...]}
+        self.use_ecc = use_ecc
+        self._failsafe = None
+
+    def _get_failsafe(self):
+        """Lazily build a FailsafePM1 instance for ECC decode."""
+        if self._failsafe is None:
+            self._failsafe = _import_failsafe()(session_id="pm-adapter")
+        return self._failsafe
+
+    def _decode_bytes(self, frame: str) -> bytes:
+        """Return raw state bytes for a frame, honoring use_ecc."""
+        if not self.use_ecc:
+            from pro_memoria import morse_to_bits, decode_bytes
+            return decode_bytes(frame)
+
+        failsafe = self._get_failsafe()
+        corrected_before = failsafe.total_corrected
+        data = failsafe.decode(frame)
+        if data is None:
+            detail = "unrecoverable corruption (double-bit error)"
+            if failsafe.last_error is not None:
+                err_type = failsafe.last_error.get("error_type", "unknown")
+                reason = failsafe.last_error.get("details", {}).get("reason", "n/a")
+                detail = f"{err_type}: {reason}"
+            raise ValueError(
+                f"PM-1 ECC decode failed — {detail} (session={failsafe.session_id})"
+            )
+        n_corrected = failsafe.total_corrected - corrected_before
+        if n_corrected > 0:
+            raise ValueError(
+                f"PM-1 ECC detected and corrected {n_corrected} bit error(s) "
+                f"in frame (session={failsafe.session_id})"
+            )
+        return data
 
     def decode(self, frame: str) -> dict:
-        """Decode PM-1 frame to raw byte dict using pro_memoria."""
-        from pro_memoria import morse_to_bits, decode_bytes
-        data = decode_bytes(frame)
+        """Decode PM-1 frame to raw byte dict using pro_memoria.
+
+        When use_ecc=False, the adapter assumes upstream has already validated
+        the frame via FailsafePM1. When use_ecc=True, decode() performs Hamming
+        [8,4,4] error detection and correction.
+        """
+        data = self._decode_bytes(frame)
         result = {}
         for field in self.schema["fields"]:
             byte_idx = field["byte"]
@@ -57,9 +121,9 @@ class Adapter:
         d = self.decode(frame)
         return {field["name"]: d[field["name"]]["label"] for field in self.schema["fields"]}
 
-    def to_rag(self, frame: str) -> str:
-        """Generate RAG-optimized description."""
-        return to_rag(self.decode(frame), self.schema)
+    def to_semantic(self, frame: str) -> str:
+        """Generate semantic description for retrieval (RAG implementation)."""
+        return _to_rag(self.decode(frame), self.schema)
 
     def to_events(self, frame: str, previous_frame: str | None = None) -> list[dict]:
         """Detect state transitions and emit multi-agent event bus events."""
@@ -68,5 +132,5 @@ class Adapter:
                         self.schema)
 
 
-from .rag import to_rag  # noqa: E402  (local import after class for readability)
+from .rag import to_rag as _to_rag  # noqa: E402  (internal implementation detail)
 from .events import to_events  # noqa: E402

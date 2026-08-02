@@ -36,8 +36,8 @@ def test_to_json():
     assert result["confidence"] == "high"
     assert result["outcome"] == "pass"
 
-def test_to_rag():
-    result = adapter.to_rag(VALID_FRAME)
+def test_to_semantic():
+    result = adapter.to_semantic(VALID_FRAME)
     assert "Agent state" in result
     assert "agent type" in result
     assert "fixer" in result
@@ -98,11 +98,11 @@ def test_all_four_modes_no_crash():
             continue
         eng = adapter.to_english(frame)
         js = adapter.to_json(frame)
-        rag = adapter.to_rag(frame)
+        sem = adapter.to_semantic(frame)
         evt = adapter.to_events(frame)
         assert isinstance(eng, str) and len(eng) > 0
         assert isinstance(js, dict)
-        assert isinstance(rag, str) and len(rag) > 0
+        assert isinstance(sem, str) and len(sem) > 0
         assert isinstance(evt, list)
 
 def test_custom_schema_loading():
