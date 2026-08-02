@@ -1,1 +1,4 @@
-pro-memoria
+pro-memoria @ git+https://github.com/rikirinjani/pro-memoria.git
+
+[test]
+pytest

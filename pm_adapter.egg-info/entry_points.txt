@@ -1,2 +1,0 @@
-[console_scripts]
-pm-adapter = pm_adapter.cli:main

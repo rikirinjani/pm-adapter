@@ -15,3 +15,6 @@ test = ["pytest"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pm_adapter*"]
+
+[tool.setuptools.package-data]
+pm_adapter = ["schemas/*.json"]

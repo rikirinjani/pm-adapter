@@ -3,4 +3,6 @@ Name: pm-adapter
 Version: 0.1.0
 Summary: Reference adapter for Pro Memoria — schema-driven PM-1 frame expansion
 Requires-Python: >=3.8
-Requires-Dist: pro-memoria
+Requires-Dist: pro-memoria @ git+https://github.com/rikirinjani/pro-memoria.git
+Provides-Extra: test
+Requires-Dist: pytest; extra == "test"
