@@ -110,6 +110,8 @@ Adapters are domain-specific. The default schema maps 8-byte agent state vectors
 }
 ```
 
+**Bit-level flags.** The adapter maps byte values to labels — it does not decompose individual bits. If your state model uses bit-level flags (e.g., byte 7 bit 1 = completeness, byte 7 bit 2 = needs_review), the domain schema author must either: (a) map the full byte to labels, or (b) split flags into separate boolean fields in the schema. The adapter has no opinion about bit-level encoding — that's a domain concern.
+
 Create domain-specific packages (`pm-adapter-hospital`, `pm-adapter-game`, etc.) with their own schemas.
 
 ## Testing

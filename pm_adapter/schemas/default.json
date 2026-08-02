@@ -9,6 +9,7 @@
     {"byte": 4, "name": "tool_calls", "values": {}},
     {"byte": 5, "name": "files_touched", "values": {}},
     {"byte": 6, "name": "outcome", "values": {"0": "running", "1": "pass", "2": "fail", "3": "retry"}},
-    {"byte": 7, "name": "flags", "values": {}}
+    {"byte": 7, "name": "flags", "values": {},
+     "_note": "Bit-level flags (e.g., byte 7 bit 1 = completeness) are the domain schema author's responsibility. The adapter maps byte values to labels, not individual bits. For bit-level flags: (a) map full byte values, e.g. {\"0\":\"no_flags\",\"2\":\"partial_schema\"}, or (b) split into separate boolean fields in your domain schema."}
   ]
 }
