@@ -1,5 +1,5 @@
 def to_events(current: dict, previous: dict | None, schema: dict) -> list[dict]:
-    """Detect state transitions and emit Hermes-compatible event dicts.
+    """Detect state transitions and emit multi-agent coordinator compatible event dicts.
     Each event: {"event": "value_change", "field": "phase", "old": "idle", "new": "act"}
     """
     events = []

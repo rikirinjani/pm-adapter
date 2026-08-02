@@ -22,6 +22,8 @@ def load_schema(name: str) -> dict:
 
 class Adapter:
     def __init__(self, schema: dict):
+        if schema is None:
+            raise TypeError("schema is required")
         self.schema = schema  # {"state_width": 8, "fields": [...]}
 
     def decode(self, frame: str) -> dict:
@@ -60,7 +62,7 @@ class Adapter:
         return to_rag(self.decode(frame), self.schema)
 
     def to_events(self, frame: str, previous_frame: str | None = None) -> list[dict]:
-        """Detect state transitions and emit events."""
+        """Detect state transitions and emit multi-agent event bus events."""
         return to_events(self.decode(frame),
                         self.decode(previous_frame) if previous_frame else None,
                         self.schema)

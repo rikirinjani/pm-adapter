@@ -12,6 +12,9 @@ dependencies = ["pro-memoria"]
 [project.scripts]
 pm-adapter = "pm_adapter.cli:main"
 
+[project.optional-dependencies]
+test = ["pytest"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pm_adapter*"]

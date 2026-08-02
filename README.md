@@ -1,6 +1,6 @@
 # PM-Adapter
 
-**Schema-driven PM-1 frame expansion.** Takes Pro Memoria (PM-1) Morse frames and expands them into human-readable English, structured JSON, RAG-optimized descriptions, and Hermes-compatible state change events.
+**Schema-driven PM-1 frame expansion.** Takes Pro Memoria (PM-1) Morse frames and expands them into human-readable English, structured JSON, RAG-optimized descriptions, and multi-agent coordinator compatible state change events.
 
 Zero LLM calls. Pure deterministic schema lookup. No part of PM-1 — consumes it.
 
@@ -34,7 +34,7 @@ print(adapter.to_json(frame))
 print(adapter.to_rag(frame))
 # "Agent state: agent type set to fixer, phase set to act..."
 
-# Hermes event bus events
+# Multi-agent event bus events
 print(adapter.to_events(frame))
 # [{"event": "state_init", "field": "agent_type", "value": "fixer"}, ...]
 ```
@@ -46,7 +46,54 @@ print(adapter.to_events(frame))
 | `to_english()` | Human-readable sentence | Debugging, human-facing dashboards |
 | `to_json()` | Structured dict | Programmatic consumption |
 | `to_rag()` | Dense searchable description | Vector embedding for semantic memory |
-| `to_events()` | State change event list | Hermes event bus, deterministic scheduling |
+| `to_events()` | State change event list | Multi-agent event bus, deterministic scheduling |
+
+## Why a separate adapter?
+
+The adapter is intentionally NOT part of PM-1. PM-1 transports bytes — it doesn't know what they mean. The adapter knows the schema. This separation keeps PM-1 small (~750 lines, zero deps) while letting every domain define its own interpretation layer.
+
+## Architecture
+
+```
+PM-1 Frame (128-char Morse)
+     │
+     ▼
+Adapter.decode(frame, schema)   ← deterministic schema lookup, zero LLM calls
+     │
+     ├── to_english()           ← human-readable
+     ├── to_json()              ← structured dict
+     ├── to_rag()               ← vector-embeddable description
+     └── to_events()            ← coordinator-compatible state changes
+```
+
+## Domain adapters
+
+The default schema maps 8-byte agent state. For domain-specific use, create separate packages with their own schemas:
+
+| Domain | Package | Schema maps |
+|--------|---------|-------------|
+| Hospital | pm-adapter-hospital | ICD codes, lab status, pharmacy state |
+| Game NPC | pm-adapter-npc | Mood, threat, objective, inventory |
+| Coding IDE | pm-adapter-coding | File, task, confidence, branch |
+
+All import `pm_adapter.Adapter` — just swap the schema.
+
+## Related
+
+- [Pro Memoria (PM-1)](https://github.com/rikirinjani/pro-memoria) — the transport protocol
+- [AgentRadio](https://arxiv.org/abs/2607.28430) — async message-passing for multi-agent coding
+- [BabelTele](https://arxiv.org/abs/2606.19857) — model-centric textual representations
+
+## Comparison to BabelTele
+
+| | PM-1 + Adapter | BabelTele |
+|---|---|---|
+| Input | Fixed-schema state vector | Arbitrary natural language |
+| Compression | Deterministic math (`. -`) | LLM-generated compact text |
+| Recovery | Bit-exact (schema lookup) | Semantic (~99.5% fidelity) |
+| Adapter role | Expands decoded bytes → text | Recovery IS the LLM call |
+
+BabelTele compresses arbitrary text with LLM recovery. PM-1 compresses structured state with deterministic recovery, and the adapter expands it for LLM consumption. Different inputs, different guarantees, complementary approaches.
 
 ## Schemas
 
@@ -65,20 +112,10 @@ Adapters are domain-specific. The default schema maps 8-byte agent state vectors
 
 Create domain-specific packages (`pm-adapter-hospital`, `pm-adapter-game`, etc.) with their own schemas.
 
-## Architecture
-
-PM-1 is the substrate (compact, deterministic transport). The adapter is the interpreter (schema-driven expansion). They are separate projects by design.
+## Testing
 
 ```
-PM-1 Frame (128 chars)
-     │
-     ▼
-Adapter.decode(frame, schema)
-     │
-     ├── to_english()
-     ├── to_json()
-     ├── to_rag()
-     └── to_events()
+pip install -e ".[test]" && pytest
 ```
 
 ## License
