@@ -24,6 +24,7 @@ Environment:
 import sys
 import os
 import json
+import re
 import time
 import urllib.request
 import urllib.error
@@ -142,6 +143,7 @@ Approach:
 }
 
 CONFIG_PATH = os.path.expanduser("~/.config/opencode/oh-my-opencode-slim.json")
+OPENCODE_CONFIG_PATH = os.path.expanduser("~/.config/opencode/opencode.jsonc")
 
 # PM-1 trace log path
 PM1_LOG_DIR = os.path.expanduser("~/.config/opencode/pm1-logs")
@@ -170,12 +172,54 @@ def load_preset_models():
         return {}
 
 
+def load_opencode_credentials():
+    """Read API credentials from opencode.jsonc (the canonical source).
+
+    This is the same pattern used by morse/context_assembly/dispatch.py.
+    Returns (base_url, api_key) or ("", "") on failure.
+    """
+    try:
+        with open(OPENCODE_CONFIG_PATH, "r", encoding="utf-8") as fh:
+            text = fh.read()
+        # Strip JSONC comments and trailing commas
+        lines = [ln for ln in text.splitlines() if not ln.lstrip().startswith("//")]
+        text = "\n".join(lines)
+        text = re.sub(r",(\s*[}\]])", r"\1", text)
+        config = json.loads(text)
+
+        # Try providers in priority order: deepseek > openai > opencode-go
+        providers = config.get("provider", {})
+        for pname in ("deepseek", "openai", "opencode-go"):
+            p = providers.get(pname, {})
+            opts = p.get("options", {})
+            base = opts.get("baseURL", "")
+            key = opts.get("apiKey", "")
+            if key:
+                # Some providers (openai) don't set baseURL — use default
+                if not base:
+                    base = "https://api.openai.com/v1"
+                # Return base URL as-is (dispatch_with_retry appends /chat/completions)
+                return base.rstrip("/"), key
+        return "", ""
+    except Exception:
+        return "", ""
+
+
 def get_api_config(agent):
-    """Get API configuration from environment variables and oh-my-opencode-slim config."""
+    """Get API configuration with 3-level fallback: env vars > opencode.jsonc > hardcoded."""
+    # 1. Environment variables (highest priority)
     base_url = os.environ.get("OPENAI_BASE_URL", "")
     api_key = os.environ.get("OPENAI_API_KEY", "")
 
-    # Check for agent-specific model override (env > config > fallback)
+    # 2. Read from opencode.jsonc (works even when OpenCode doesn't pass env vars)
+    if not base_url or not api_key:
+        file_url, file_key = load_opencode_credentials()
+        if not base_url:
+            base_url = file_url
+        if not api_key:
+            api_key = file_key
+
+    # Agent-specific model override (env > config > fallback)
     env_model_key = f"{agent.upper()}_MODEL"
     env_model = os.environ.get(env_model_key)
     if env_model:
