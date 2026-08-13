@@ -29,6 +29,17 @@ import urllib.request
 import urllib.error
 import ssl
 
+# PM-1 encoder for compressed logging
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from pm_adapter.encoder import (
+        encode_tool_call, encode_handoff, encode_error, encode_cost,
+        bucket_tokens, bucket_duration, bucket_cost, bucket_size,
+    )
+    PM1_AVAILABLE = True
+except ImportError:
+    PM1_AVAILABLE = False
+
 # Budget constants — same as dispatch.py
 MIN_COMPLETION_TOKENS = 2048
 MAX_COMPLETION_TOKENS = 32768
@@ -128,6 +139,10 @@ Approach:
 
 CONFIG_PATH = os.path.expanduser("~/.config/opencode/oh-my-opencode-slim.json")
 
+# PM-1 trace log path
+PM1_LOG_DIR = os.path.expanduser("~/.config/opencode/pm1-logs")
+os.makedirs(PM1_LOG_DIR, exist_ok=True)
+
 # Fallback defaults if config can't be read
 FALLBACK_MODELS = {
     "oracle": "deepseek-v4-pro",
@@ -177,6 +192,86 @@ def estimate_tokens(text):
     return len(text) // 4
 
 
+def pm1_log(frame: str, schema_name: str, metadata: dict | None = None):
+    """Append a PM-1 frame to the daily log file."""
+    if not PM1_AVAILABLE:
+        return
+    import datetime
+    today = datetime.date.today().isoformat()
+    log_path = os.path.join(PM1_LOG_DIR, f"{today}.jsonl")
+    entry = {"frame": frame, "schema": schema_name, "ts": time.time()}
+    if metadata:
+        entry["meta"] = metadata
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def log_tool_call(agent: str, tool: str, outcome: str, duration: float,
+                  size_bytes: int = 0, tokens_in: int = 0, tokens_out: int = 0):
+    """Log a tool call as PM-1 compressed frame."""
+    if not PM1_AVAILABLE:
+        return
+    frame = encode_tool_call(
+        agent=agent, tool=tool, outcome=outcome,
+        duration_bucket=bucket_duration(duration),
+        size_bucket=bucket_size(size_bytes) if size_bytes else "<1KB",
+        tokens_in=min(tokens_in // 100, 255),  # compress to byte
+        tokens_out=min(tokens_out // 100, 255),
+    )
+    pm1_log(frame, "tool_call", {"agent": agent, "tool": tool, "outcome": outcome})
+
+
+def log_handoff(from_agent: str, to_agent: str, reason: str,
+                confidence: str = "medium", files_touched: int = 0,
+                tokens_used: int = 0, duration: float = 0):
+    """Log a handoff as PM-1 compressed frame."""
+    if not PM1_AVAILABLE:
+        return
+    dur_bucket = "30s-2m"
+    if duration < 30: dur_bucket = "<30s"
+    elif duration < 600: dur_bucket = "2-10m"
+    elif duration < 1800: dur_bucket = "10-30m"
+    else: dur_bucket = ">30m"
+
+    frame = encode_handoff(
+        from_agent=from_agent, to_agent=to_agent, reason=reason,
+        confidence=confidence, files_touched=min(files_touched, 255),
+        tokens_used=min(tokens_used // 1000, 255),
+        duration_bucket=dur_bucket,
+    )
+    pm1_log(frame, "handoff", {"from": from_agent, "to": to_agent, "reason": reason})
+
+
+def log_error(agent: str, error_type: str, severity: str = "error",
+              retry_count: int = 0, http_code: int = 0, duration: float = 0,
+              recovery: str = "none"):
+    """Log an error as PM-1 compressed frame."""
+    if not PM1_AVAILABLE:
+        return
+    frame = encode_error(
+        agent=agent, error_type=error_type, severity=severity,
+        retry_count=min(retry_count, 255), http_code=min(http_code, 255),
+        duration_bucket=bucket_duration(duration), recovery=recovery,
+    )
+    pm1_log(frame, "error", {"agent": agent, "type": error_type, "severity": severity})
+
+
+def log_cost(agent: str, model_tier: str, input_tokens: int, output_tokens: int,
+             cost_cents: float, duration: float, task_count: int = 1):
+    """Log cost as PM-1 compressed frame."""
+    if not PM1_AVAILABLE:
+        return
+    frame = encode_cost(
+        agent=agent, model_tier=model_tier,
+        input_bucket=bucket_tokens(input_tokens),
+        output_bucket=bucket_tokens(output_tokens),
+        cost_bucket=bucket_cost(cost_cents),
+        duration_bucket=bucket_duration(duration),
+        task_count=min(task_count, 255),
+    )
+    pm1_log(frame, "cost", {"agent": agent, "model": model_tier, "cost_cents": cost_cents})
+
+
 def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3):
     """Budget-aware OpenAI-compatible API dispatch with retry logic."""
     ctx = ssl.create_default_context()
@@ -207,19 +302,32 @@ def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3):
                 method="POST",
             )
 
+            t_req = time.time()
             with urllib.request.urlopen(req, context=ctx, timeout=300) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
+            duration = time.time() - t_req
 
             content = data["choices"][0]["message"]["content"]
             finish_reason = data["choices"][0].get("finish_reason", "unknown")
             usage = data.get("usage", {})
             actual_completion = usage.get("completion_tokens", 0)
+            prompt_tokens = usage.get("prompt_tokens", 0)
+
+            # PM-1: log successful tool call
+            log_tool_call(
+                agent=agent, tool="api_call", outcome="ok",
+                duration=duration, size_bytes=len(content),
+                tokens_in=prompt_tokens, tokens_out=actual_completion,
+            )
 
             if finish_reason == "length" or actual_completion >= budget * 0.95:
                 if attempt < max_retries - 1:
                     budget = min(budget * 2, MAX_COMPLETION_TOKENS)
                     payload["max_completion_tokens"] = budget
                     print(f"[{agent}] Truncation detected (attempt {attempt + 1}), retrying with budget={budget}", file=sys.stderr)
+                    # PM-1: log retry
+                    log_error(agent=agent, error_type="timeout", severity="warn",
+                              retry_count=attempt + 1, duration=duration, recovery="retry_ok")
                     time.sleep(2)
                     continue
 
@@ -229,27 +337,45 @@ def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3):
                 "usage": usage,
                 "model": model,
                 "budget_used": f"{actual_completion}/{budget}",
+                "pm1_frame": encode_tool_call(
+                    agent=agent, tool="api_call", outcome="ok",
+                    duration_bucket=bucket_duration(duration),
+                    size_bucket=bucket_size(len(content)),
+                    tokens_in=min(prompt_tokens // 100, 255),
+                    tokens_out=min(actual_completion // 100, 255),
+                ) if PM1_AVAILABLE else None,
             }
 
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")
+            duration = time.time() - t_req if 't_req' in dir() else 0
             if e.code == 429:
                 retry_after = int(e.headers.get("Retry-After", 10))
                 print(f"[{agent}] Rate limited, waiting {retry_after}s (attempt {attempt + 1})", file=sys.stderr)
+                log_error(agent=agent, error_type="rate_limit", severity="warn",
+                          retry_count=attempt + 1, http_code=429, duration=duration, recovery="retry_ok")
                 time.sleep(retry_after)
                 continue
             elif e.code in (502, 503, 504) and attempt < max_retries - 1:
                 print(f"[{agent}] Server error {e.code}, retrying in 5s (attempt {attempt + 1})", file=sys.stderr)
+                log_error(agent=agent, error_type="http", severity="error",
+                          retry_count=attempt + 1, http_code=e.code, duration=duration, recovery="retry_ok")
                 time.sleep(5)
                 continue
             else:
+                log_error(agent=agent, error_type="http", severity="critical",
+                          retry_count=attempt + 1, http_code=e.code, duration=duration, recovery="abort")
                 return {"content": "", "error": f"HTTP {e.code}: {body[:500]}", "model": model}
 
         except Exception as e:
             if attempt < max_retries - 1:
                 print(f"[{agent}] Error: {e}, retrying in 5s (attempt {attempt + 1})", file=sys.stderr)
+                log_error(agent=agent, error_type="unknown", severity="error",
+                          retry_count=attempt + 1, duration=duration, recovery="retry_ok")
                 time.sleep(5)
                 continue
+            log_error(agent=agent, error_type="unknown", severity="critical",
+                      retry_count=attempt + 1, duration=duration, recovery="abort")
             return {"content": "", "error": str(e), "model": model}
 
     return {"content": "", "error": "Max retries exceeded", "model": model}
@@ -302,6 +428,18 @@ def main():
     t0 = time.time()
     result = dispatch_with_retry(messages, model, base_url, api_key)
     elapsed = time.time() - t0
+
+    # PM-1: log cost summary
+    if PM1_AVAILABLE and not result.get("error"):
+        usage = result.get("usage", {})
+        prompt_t = usage.get("prompt_tokens", 0)
+        comp_t = usage.get("completion_tokens", 0)
+        # Rough cost estimate (deepseek pricing: ~$0.14/1M input, ~$0.28/1M output)
+        cost_cents = (prompt_t * 0.14 + comp_t * 0.28) / 100
+        model_tier = "flash" if "flash" in model else ("pro" if "pro" in model else "free")
+        log_cost(agent=agent, model_tier=model_tier,
+                 input_tokens=prompt_t, output_tokens=comp_t,
+                 cost_cents=cost_cents, duration=elapsed)
 
     if args.json:
         result["elapsed_seconds"] = round(elapsed, 1)
