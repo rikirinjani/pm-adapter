@@ -38,6 +38,8 @@ try:
         prune_logs, detect_project,
     )
     from pm_adapter.state_reducer import StateReducer
+    from pm_adapter.session_reducer import SessionReducer
+    from pm_adapter.project_reducer import ProjectReducer
     PM1_AVAILABLE = True
 except ImportError:
     PM1_AVAILABLE = False
@@ -484,6 +486,35 @@ def main():
         log_cost(agent=agent, model_tier=model_tier,
                  input_tokens=prompt_t, output_tokens=comp_t,
                  cost_cents=cost_cents, duration=elapsed, project=project)
+
+        # PM-1: emit session summary on dispatch completion
+        session_reducer = SessionReducer(project=project)
+        session_frame = session_reducer.emit_summary(
+            agent=agent,
+            task=args.prompt,
+            outcome="success",
+            tokens_used=prompt_t + comp_t,
+            cost_cents=cost_cents,
+            duration_seconds=elapsed,
+            files_touched=0,
+            error_type="none",
+        )
+        pm1_log(session_frame, "session_summary", {"agent": agent, "project": project})
+
+    elif PM1_AVAILABLE and result.get("error"):
+        # PM-1: emit failed session summary
+        session_reducer = SessionReducer(project=project)
+        session_frame = session_reducer.emit_summary(
+            agent=agent,
+            task=args.prompt,
+            outcome="failed",
+            tokens_used=0,
+            cost_cents=0,
+            duration_seconds=elapsed,
+            files_touched=0,
+            error_type="unknown",
+        )
+        pm1_log(session_frame, "session_summary", {"agent": agent, "project": project, "error": True})
 
     if args.json:
         result["elapsed_seconds"] = round(elapsed, 1)

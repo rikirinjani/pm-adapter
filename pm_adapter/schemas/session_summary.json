@@ -1,0 +1,16 @@
+{
+  "name": "session_summary",
+  "state_width": 10,
+  "fields": [
+    {"byte": 0, "name": "project", "values": {"0": "global", "1": "kronos", "2": "pm-adapter", "3": "rag-pubmed", "4": "deers-rock", "5": "other"}},
+    {"byte": 1, "name": "tasks_completed", "values": {}},
+    {"byte": 2, "name": "tasks_failed", "values": {}},
+    {"byte": 3, "name": "total_tool_calls", "values": {}},
+    {"byte": 4, "name": "total_errors", "values": {}},
+    {"byte": 5, "name": "dominant_agent", "values": {"0": "orchestrator", "1": "fixer", "2": "oracle", "3": "explorer", "4": "librarian", "5": "designer", "6": "council"}},
+    {"byte": 6, "name": "cost_bucket", "values": {"0": "lt_1c", "1": "1c_5c", "2": "5c_20c", "3": "20c_1d", "4": "gt_1d"}},
+    {"byte": 7, "name": "duration_bucket", "values": {"0": "<1m", "1": "1-5m", "2": "5-30m", "3": "30m-2h", "4": ">2h"}},
+    {"byte": 8, "name": "outcome", "values": {"0": "success", "1": "partial", "2": "failed", "3": "abandoned"}},
+    {"byte": 9, "name": "flags", "values": {"0": "none", "1": "has_failures", "2": "over_budget", "4": "truncated"}}
+  ]
+}
