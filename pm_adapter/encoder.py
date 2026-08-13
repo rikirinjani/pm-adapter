@@ -230,12 +230,21 @@ def bucket_tokens(n: int) -> str:
 
 
 def bucket_duration(seconds: float) -> str:
-    """Map duration to bucket label."""
+    """Map duration to bucket label (tool_call schema)."""
     if seconds < 1: return "<1s"
     if seconds < 5: return "1-5s"
     if seconds < 30: return "5-30s"
     if seconds < 120: return "30-120s"
     return ">120s"
+
+
+def bucket_duration_cost(seconds: float) -> str:
+    """Map duration to bucket label (cost_log schema)."""
+    if seconds < 5: return "<5s"
+    if seconds < 30: return "5-30s"
+    if seconds < 120: return "30s-2m"
+    if seconds < 600: return "2-10m"
+    return ">10m"
 
 
 def bucket_cost(cents: float) -> str:

@@ -1,0 +1,7 @@
+# Project: pm-adapter
+Sessions: 1 | Tasks: 3 | Errors: 1
+Health: unhealthy | Error rate: 33.3%
+Total cost: $0.01 | Tokens: 4,500
+
+## Last Session
+Outcome: success

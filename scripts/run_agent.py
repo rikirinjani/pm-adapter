@@ -34,11 +34,11 @@ try:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     from pm_adapter.encoder import (
         encode_tool_call, encode_handoff, encode_error, encode_cost,
-        bucket_tokens, bucket_duration, bucket_cost, bucket_size,
+        bucket_tokens, bucket_duration, bucket_duration_cost, bucket_cost, bucket_size,
         prune_logs, detect_project,
     )
     from pm_adapter.state_reducer import StateReducer
-    from pm_adapter.session_reducer import SessionReducer
+    from pm_adapter.session_reducer import SessionReducer, SessionState
     from pm_adapter.project_reducer import ProjectReducer
     PM1_AVAILABLE = True
 except ImportError:
@@ -276,14 +276,14 @@ def log_cost(agent: str, model_tier: str, input_tokens: int, output_tokens: int,
         input_bucket=bucket_tokens(input_tokens),
         output_bucket=bucket_tokens(output_tokens),
         cost_bucket=bucket_cost(cost_cents),
-        duration_bucket=bucket_duration(duration),
+        duration_bucket=bucket_duration_cost(duration),
         task_count=min(task_count, 255),
         project=project,
     )
     pm1_log(frame, "cost", {"agent": agent, "model": model_tier, "cost_cents": cost_cents, "project": project})
 
 
-def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3, project="global"):
+def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3, project="global", agent="orchestrator"):
     """Budget-aware OpenAI-compatible API dispatch with retry logic."""
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -296,8 +296,10 @@ def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3, proje
         "model": model,
         "messages": messages,
         "max_completion_tokens": budget,
-        "temperature": 0.7,
     }
+    # Only set temperature for models that support it (not gpt-5.x reasoning models)
+    if "gpt-5" not in model:
+        payload["temperature"] = 0.7
 
     headers = {
         "Content-Type": "application/json",
@@ -445,16 +447,11 @@ def main():
     state_context = ""
     if args.state_context and PM1_AVAILABLE:
         try:
-            reducer = StateReducer(project=project)
-            state = reducer.reduce()
-            state_context = reducer.assemble_packet(state, task=args.prompt)
-            # Log failure patterns if any
-            patterns = reducer.get_failure_patterns(min_count=2)
-            if patterns:
-                state_context += "\n## Known Failure Patterns\n"
-                for p in patterns[:5]:
-                    state_context += f"- {p['error_type']}: {p['count']}x, recovery: {p['dominant_recovery']}\n"
+            # Multi-source: operational telemetry + decisions
+            proj_reducer = ProjectReducer()
+            state_context = proj_reducer.get_context_for_new_session(project, task_domain=args.prompt[:50])
         except Exception as e:
+            print(f"[{agent}] Warning: Could not build state context: {e}", file=sys.stderr)
             print(f"[{agent}] Warning: Could not build state context: {e}", file=sys.stderr)
 
     # Build messages
@@ -472,7 +469,7 @@ def main():
 
     # Dispatch
     t0 = time.time()
-    result = dispatch_with_retry(messages, model, base_url, api_key, project=project)
+    result = dispatch_with_retry(messages, model, base_url, api_key, project=project, agent=agent)
     elapsed = time.time() - t0
 
     # PM-1: log cost summary
@@ -488,32 +485,40 @@ def main():
                  cost_cents=cost_cents, duration=elapsed, project=project)
 
         # PM-1: emit session summary on dispatch completion
-        session_reducer = SessionReducer(project=project)
-        session_frame = session_reducer.emit_summary(
-            agent=agent,
-            task=args.prompt,
-            outcome="success",
-            tokens_used=prompt_t + comp_t,
-            cost_cents=cost_cents,
-            duration_seconds=elapsed,
-            files_touched=0,
-            error_type="none",
-        )
+        session_reducer = SessionReducer()
+        ss = SessionState(session_id=f"{agent}-{int(time.time())}", project=project)
+        ss.tasks_completed = 1
+        ss.tasks_failed = 0
+        ss.total_tool_calls = 1
+        ss.total_errors = 0
+        ss.agent_calls = {agent: 1}
+        ss.total_cost_cents = cost_cents
+        ss.total_tokens = prompt_t + comp_t
+        ss.start_ts = t0
+        ss.end_ts = time.time()
+        ss.error_patterns = {}
+        ss.outcome = "success"
+        session_frame = session_reducer.emit_summary(ss)
+        session_reducer.save_session(ss)
         pm1_log(session_frame, "session_summary", {"agent": agent, "project": project})
 
     elif PM1_AVAILABLE and result.get("error"):
         # PM-1: emit failed session summary
-        session_reducer = SessionReducer(project=project)
-        session_frame = session_reducer.emit_summary(
-            agent=agent,
-            task=args.prompt,
-            outcome="failed",
-            tokens_used=0,
-            cost_cents=0,
-            duration_seconds=elapsed,
-            files_touched=0,
-            error_type="unknown",
-        )
+        session_reducer = SessionReducer()
+        ss = SessionState(session_id=f"{agent}-{int(time.time())}", project=project)
+        ss.tasks_completed = 0
+        ss.tasks_failed = 1
+        ss.total_tool_calls = 1
+        ss.total_errors = 1
+        ss.agent_calls = {agent: 1}
+        ss.total_cost_cents = 0
+        ss.total_tokens = 0
+        ss.start_ts = t0
+        ss.end_ts = time.time()
+        ss.error_patterns = {"unknown": 1}
+        ss.outcome = "failed"
+        session_frame = session_reducer.emit_summary(ss)
+        session_reducer.save_session(ss)
         pm1_log(session_frame, "session_summary", {"agent": agent, "project": project, "error": True})
 
     if args.json:

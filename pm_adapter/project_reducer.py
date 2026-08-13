@@ -198,11 +198,14 @@ class ProjectReducer:
                 })
         return sorted(patterns, key=lambda x: -x["total_count"])
 
-    def get_context_for_new_session(self, project: str) -> str:
+    def get_context_for_new_session(self, project: str, task_domain: str = "") -> str:
         """Generate context packet for initializing a new session.
 
+        Multi-source: operational telemetry + relevant decisions.
         This is what the project state feeds into the context assembler.
         """
+        from .decision_store import DecisionStore
+
         state = self.reduce_project(project)
         lines = []
         lines.append(f"# Project: {state.project}")
@@ -230,5 +233,15 @@ class ProjectReducer:
         lines.append(f"## Last Session")
         lines.append(f"Outcome: {state.last_session_outcome}")
         lines.append("")
+
+        # Decision context (the missing layer)
+        try:
+            ds = DecisionStore()
+            decision_ctx = ds.get_context_packet(project, task_domain=task_domain)
+            if decision_ctx:
+                lines.append(decision_ctx)
+                lines.append("")
+        except Exception:
+            pass  # Decision store not available, skip silently
 
         return "\n".join(lines)

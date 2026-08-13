@@ -3,7 +3,7 @@
   "state_width": 9,
   "fields": [
     {"byte": 0, "name": "agent", "values": {"0": "orchestrator", "1": "fixer", "2": "oracle", "3": "explorer", "4": "librarian", "5": "designer", "6": "council"}},
-    {"byte": 1, "name": "tool", "values": {"0": "read", "1": "write", "2": "edit", "3": "grep", "4": "glob", "5": "bash", "6": "task", "7": "skill", "8": "other"}},
+    {"byte": 1, "name": "tool", "values": {"0": "read", "1": "write", "2": "edit", "3": "grep", "4": "glob", "5": "bash", "6": "task", "7": "skill", "8": "api_call", "9": "other"}},
     {"byte": 2, "name": "outcome", "values": {"0": "ok", "1": "error", "2": "timeout", "3": "retry"}},
     {"byte": 3, "name": "duration_bucket", "values": {"0": "<1s", "1": "1-5s", "2": "5-30s", "3": "30-120s", "4": ">120s"}},
     {"byte": 4, "name": "size_bucket", "values": {"0": "<1KB", "1": "1-10KB", "2": "10-100KB", "3": "100KB-1MB", "4": ">1MB"}},
