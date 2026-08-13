@@ -40,7 +40,8 @@ class Decision:
 
     def __init__(self, id: str, decision: str, rationale: str, scope: str,
                  tags: list[str], status: str = "active", supersedes: str = "",
-                 session_id: str = "", task_summary: str = "", domain: str = ""):
+                 session_id: str = "", task_summary: str = "", domain: str = "",
+                 source: str = "manual"):
         self.id = id
         self.decision = decision
         self.rationale = rationale
@@ -51,6 +52,7 @@ class Decision:
         self.session_id = session_id
         self.task_summary = task_summary
         self.domain = domain
+        self.source = source
         self.created_at = datetime.now().isoformat()
 
     def to_dict(self) -> dict:
@@ -65,6 +67,7 @@ class Decision:
             "session_id": self.session_id,
             "task_summary": self.task_summary,
             "domain": self.domain,
+            "source": self.source,
             "created_at": self.created_at,
         }
 
@@ -81,6 +84,7 @@ class Decision:
             session_id=data.get("session_id", ""),
             task_summary=data.get("task_summary", ""),
             domain=data.get("domain", ""),
+            source=data.get("source", "manual"),
         )
         d.created_at = data.get("created_at", d.created_at)
         return d
@@ -115,7 +119,7 @@ class DecisionStore:
     def add(self, project: str, decision: str, rationale: str,
             tags: list[str] | None = None, domain: str = "",
             session_id: str = "", task_summary: str = "",
-            supersedes: str = "") -> Decision:
+            supersedes: str = "", source: str = "manual") -> Decision:
         """Record a new decision."""
         dec = Decision(
             id=self._next_id(project),
@@ -128,6 +132,7 @@ class DecisionStore:
             session_id=session_id,
             task_summary=task_summary,
             domain=domain,
+            source=source,
         )
 
         # If superseding an old decision, mark it
