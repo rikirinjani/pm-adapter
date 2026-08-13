@@ -37,6 +37,7 @@ try:
         bucket_tokens, bucket_duration, bucket_cost, bucket_size,
         prune_logs, detect_project,
     )
+    from pm_adapter.state_reducer import StateReducer
     PM1_AVAILABLE = True
 except ImportError:
     PM1_AVAILABLE = False
@@ -407,6 +408,7 @@ def main():
     parser.add_argument("--system-prompt", help="Override system prompt")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--project", help="Project name for PM-1 logging (auto-detected if omitted)")
+    parser.add_argument("--state-context", action="store_true", help="Include PM-1 state context in prompt")
     args = parser.parse_args()
 
     agent = args.agent
@@ -437,9 +439,27 @@ def main():
             except Exception as e:
                 print(f"[{agent}] Warning: Could not read {fpath}: {e}", file=sys.stderr)
 
+    # PM-1: build state context from event history
+    state_context = ""
+    if args.state_context and PM1_AVAILABLE:
+        try:
+            reducer = StateReducer(project=project)
+            state = reducer.reduce()
+            state_context = reducer.assemble_packet(state, task=args.prompt)
+            # Log failure patterns if any
+            patterns = reducer.get_failure_patterns(min_count=2)
+            if patterns:
+                state_context += "\n## Known Failure Patterns\n"
+                for p in patterns[:5]:
+                    state_context += f"- {p['error_type']}: {p['count']}x, recovery: {p['dominant_recovery']}\n"
+        except Exception as e:
+            print(f"[{agent}] Warning: Could not build state context: {e}", file=sys.stderr)
+
     # Build messages
     system = args.system_prompt or AGENT_PROMPTS[agent]
     user_content = args.prompt
+    if state_context:
+        user_content = f"{state_context}\n\n---\n\n{user_content}"
     if file_context:
         user_content += f"\n\n{file_context}"
 

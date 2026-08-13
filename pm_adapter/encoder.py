@@ -175,6 +175,7 @@ def encode_handoff(
     confidence: str = "medium", files_touched: int = 0,
     tokens_used: int = 0, duration_bucket: str = "30s-2m",
     flags: str = "none", project: str | None = None,
+    task_id: int = 0,
 ) -> str:
     """Encode a handoff message to PM-1 frame."""
     return encode_record("handoff", {
@@ -182,6 +183,7 @@ def encode_handoff(
         "confidence": confidence, "files_touched": files_touched,
         "tokens_used": tokens_used, "duration_bucket": duration_bucket,
         "flags": flags, "project": project or detect_project(),
+        "task_id": min(task_id, 255),
     })
 
 
