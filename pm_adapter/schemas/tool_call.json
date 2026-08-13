@@ -1,6 +1,6 @@
 {
   "name": "tool_call_result",
-  "state_width": 8,
+  "state_width": 9,
   "fields": [
     {"byte": 0, "name": "agent", "values": {"0": "orchestrator", "1": "fixer", "2": "oracle", "3": "explorer", "4": "librarian", "5": "designer", "6": "council"}},
     {"byte": 1, "name": "tool", "values": {"0": "read", "1": "write", "2": "edit", "3": "grep", "4": "glob", "5": "bash", "6": "task", "7": "skill", "8": "other"}},
@@ -9,6 +9,7 @@
     {"byte": 4, "name": "size_bucket", "values": {"0": "<1KB", "1": "1-10KB", "2": "10-100KB", "3": "100KB-1MB", "4": ">1MB"}},
     {"byte": 5, "name": "tokens_in", "values": {}},
     {"byte": 6, "name": "tokens_out", "values": {}},
-    {"byte": 7, "name": "flags", "values": {"0": "none", "1": "cached", "2": "truncated", "4": "retried"}}
+    {"byte": 7, "name": "flags", "values": {"0": "none", "1": "cached", "2": "truncated", "4": "retried"}},
+    {"byte": 8, "name": "project", "values": {"0": "global", "1": "kronos", "2": "pm-adapter", "3": "rag-pubmed", "4": "deers-rock", "5": "other"}}
   ]
 }

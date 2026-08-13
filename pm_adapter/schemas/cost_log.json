@@ -1,6 +1,6 @@
 {
   "name": "cost_log",
-  "state_width": 8,
+  "state_width": 9,
   "fields": [
     {"byte": 0, "name": "agent", "values": {"0": "orchestrator", "1": "fixer", "2": "oracle", "3": "explorer", "4": "librarian", "5": "designer", "6": "council"}},
     {"byte": 1, "name": "model_tier", "values": {"0": "flash", "1": "pro", "2": "max", "3": "free"}},
@@ -9,6 +9,7 @@
     {"byte": 4, "name": "cost_bucket", "values": {"0": "lt_1c", "1": "1c_5c", "2": "5c_20c", "3": "20c_1d", "4": "gt_1d"}},
     {"byte": 5, "name": "duration_bucket", "values": {"0": "<5s", "1": "5-30s", "2": "30s-2m", "3": "2-10m", "4": ">10m"}},
     {"byte": 6, "name": "task_count", "values": {}},
-    {"byte": 7, "name": "flags", "values": {"0": "none", "1": "budget_warning", "2": "over_budget", "4": "first_call"}}
+    {"byte": 7, "name": "flags", "values": {"0": "none", "1": "budget_warning", "2": "over_budget", "4": "first_call"}},
+    {"byte": 8, "name": "project", "values": {"0": "global", "1": "kronos", "2": "pm-adapter", "3": "rag-pubmed", "4": "deers-rock", "5": "other"}}
   ]
 }

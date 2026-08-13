@@ -35,6 +35,7 @@ try:
     from pm_adapter.encoder import (
         encode_tool_call, encode_handoff, encode_error, encode_cost,
         bucket_tokens, bucket_duration, bucket_cost, bucket_size,
+        prune_logs, detect_project,
     )
     PM1_AVAILABLE = True
 except ImportError:
@@ -207,7 +208,8 @@ def pm1_log(frame: str, schema_name: str, metadata: dict | None = None):
 
 
 def log_tool_call(agent: str, tool: str, outcome: str, duration: float,
-                  size_bytes: int = 0, tokens_in: int = 0, tokens_out: int = 0):
+                  size_bytes: int = 0, tokens_in: int = 0, tokens_out: int = 0,
+                  project: str = "global"):
     """Log a tool call as PM-1 compressed frame."""
     if not PM1_AVAILABLE:
         return
@@ -217,13 +219,15 @@ def log_tool_call(agent: str, tool: str, outcome: str, duration: float,
         size_bucket=bucket_size(size_bytes) if size_bytes else "<1KB",
         tokens_in=min(tokens_in // 100, 255),  # compress to byte
         tokens_out=min(tokens_out // 100, 255),
+        project=project,
     )
-    pm1_log(frame, "tool_call", {"agent": agent, "tool": tool, "outcome": outcome})
+    pm1_log(frame, "tool_call", {"agent": agent, "tool": tool, "outcome": outcome, "project": project})
 
 
 def log_handoff(from_agent: str, to_agent: str, reason: str,
                 confidence: str = "medium", files_touched: int = 0,
-                tokens_used: int = 0, duration: float = 0):
+                tokens_used: int = 0, duration: float = 0,
+                project: str = "global"):
     """Log a handoff as PM-1 compressed frame."""
     if not PM1_AVAILABLE:
         return
@@ -238,13 +242,14 @@ def log_handoff(from_agent: str, to_agent: str, reason: str,
         confidence=confidence, files_touched=min(files_touched, 255),
         tokens_used=min(tokens_used // 1000, 255),
         duration_bucket=dur_bucket,
+        project=project,
     )
-    pm1_log(frame, "handoff", {"from": from_agent, "to": to_agent, "reason": reason})
+    pm1_log(frame, "handoff", {"from": from_agent, "to": to_agent, "reason": reason, "project": project})
 
 
 def log_error(agent: str, error_type: str, severity: str = "error",
               retry_count: int = 0, http_code: int = 0, duration: float = 0,
-              recovery: str = "none"):
+              recovery: str = "none", project: str = "global"):
     """Log an error as PM-1 compressed frame."""
     if not PM1_AVAILABLE:
         return
@@ -252,12 +257,14 @@ def log_error(agent: str, error_type: str, severity: str = "error",
         agent=agent, error_type=error_type, severity=severity,
         retry_count=min(retry_count, 255), http_code=min(http_code, 255),
         duration_bucket=bucket_duration(duration), recovery=recovery,
+        project=project,
     )
-    pm1_log(frame, "error", {"agent": agent, "type": error_type, "severity": severity})
+    pm1_log(frame, "error", {"agent": agent, "type": error_type, "severity": severity, "project": project})
 
 
 def log_cost(agent: str, model_tier: str, input_tokens: int, output_tokens: int,
-             cost_cents: float, duration: float, task_count: int = 1):
+             cost_cents: float, duration: float, task_count: int = 1,
+             project: str = "global"):
     """Log cost as PM-1 compressed frame."""
     if not PM1_AVAILABLE:
         return
@@ -268,11 +275,12 @@ def log_cost(agent: str, model_tier: str, input_tokens: int, output_tokens: int,
         cost_bucket=bucket_cost(cost_cents),
         duration_bucket=bucket_duration(duration),
         task_count=min(task_count, 255),
+        project=project,
     )
-    pm1_log(frame, "cost", {"agent": agent, "model": model_tier, "cost_cents": cost_cents})
+    pm1_log(frame, "cost", {"agent": agent, "model": model_tier, "cost_cents": cost_cents, "project": project})
 
 
-def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3):
+def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3, project="global"):
     """Budget-aware OpenAI-compatible API dispatch with retry logic."""
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -318,6 +326,7 @@ def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3):
                 agent=agent, tool="api_call", outcome="ok",
                 duration=duration, size_bytes=len(content),
                 tokens_in=prompt_tokens, tokens_out=actual_completion,
+                project=project,
             )
 
             if finish_reason == "length" or actual_completion >= budget * 0.95:
@@ -327,7 +336,8 @@ def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3):
                     print(f"[{agent}] Truncation detected (attempt {attempt + 1}), retrying with budget={budget}", file=sys.stderr)
                     # PM-1: log retry
                     log_error(agent=agent, error_type="timeout", severity="warn",
-                              retry_count=attempt + 1, duration=duration, recovery="retry_ok")
+                              retry_count=attempt + 1, duration=duration, recovery="retry_ok",
+                              project=project)
                     time.sleep(2)
                     continue
 
@@ -353,29 +363,34 @@ def dispatch_with_retry(messages, model, base_url, api_key, max_retries=3):
                 retry_after = int(e.headers.get("Retry-After", 10))
                 print(f"[{agent}] Rate limited, waiting {retry_after}s (attempt {attempt + 1})", file=sys.stderr)
                 log_error(agent=agent, error_type="rate_limit", severity="warn",
-                          retry_count=attempt + 1, http_code=429, duration=duration, recovery="retry_ok")
+                          retry_count=attempt + 1, http_code=429, duration=duration, recovery="retry_ok",
+                          project=project)
                 time.sleep(retry_after)
                 continue
             elif e.code in (502, 503, 504) and attempt < max_retries - 1:
                 print(f"[{agent}] Server error {e.code}, retrying in 5s (attempt {attempt + 1})", file=sys.stderr)
                 log_error(agent=agent, error_type="http", severity="error",
-                          retry_count=attempt + 1, http_code=e.code, duration=duration, recovery="retry_ok")
+                          retry_count=attempt + 1, http_code=e.code, duration=duration, recovery="retry_ok",
+                          project=project)
                 time.sleep(5)
                 continue
             else:
                 log_error(agent=agent, error_type="http", severity="critical",
-                          retry_count=attempt + 1, http_code=e.code, duration=duration, recovery="abort")
+                          retry_count=attempt + 1, http_code=e.code, duration=duration, recovery="abort",
+                          project=project)
                 return {"content": "", "error": f"HTTP {e.code}: {body[:500]}", "model": model}
 
         except Exception as e:
             if attempt < max_retries - 1:
                 print(f"[{agent}] Error: {e}, retrying in 5s (attempt {attempt + 1})", file=sys.stderr)
                 log_error(agent=agent, error_type="unknown", severity="error",
-                          retry_count=attempt + 1, duration=duration, recovery="retry_ok")
+                          retry_count=attempt + 1, duration=duration, recovery="retry_ok",
+                          project=project)
                 time.sleep(5)
                 continue
             log_error(agent=agent, error_type="unknown", severity="critical",
-                      retry_count=attempt + 1, duration=duration, recovery="abort")
+                      retry_count=attempt + 1, duration=duration, recovery="abort",
+                      project=project)
             return {"content": "", "error": str(e), "model": model}
 
     return {"content": "", "error": "Max retries exceeded", "model": model}
@@ -391,9 +406,18 @@ def main():
     parser.add_argument("--model", help="Override model ID")
     parser.add_argument("--system-prompt", help="Override system prompt")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--project", help="Project name for PM-1 logging (auto-detected if omitted)")
     args = parser.parse_args()
 
     agent = args.agent
+
+    # PM-1: prune old logs on startup, detect project
+    if PM1_AVAILABLE:
+        pruned = prune_logs(keep_days=7)
+        if pruned:
+            print(f"[pm1] Pruned {pruned} old log files", file=sys.stderr)
+
+    project = args.project or detect_project()
     base_url, api_key, model = get_api_config(agent)
     if args.model:
         model = args.model.split("/")[-1] if "/" in args.model else args.model
@@ -426,7 +450,7 @@ def main():
 
     # Dispatch
     t0 = time.time()
-    result = dispatch_with_retry(messages, model, base_url, api_key)
+    result = dispatch_with_retry(messages, model, base_url, api_key, project=project)
     elapsed = time.time() - t0
 
     # PM-1: log cost summary
@@ -439,7 +463,7 @@ def main():
         model_tier = "flash" if "flash" in model else ("pro" if "pro" in model else "free")
         log_cost(agent=agent, model_tier=model_tier,
                  input_tokens=prompt_t, output_tokens=comp_t,
-                 cost_cents=cost_cents, duration=elapsed)
+                 cost_cents=cost_cents, duration=elapsed, project=project)
 
     if args.json:
         result["elapsed_seconds"] = round(elapsed, 1)

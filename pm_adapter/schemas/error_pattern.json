@@ -1,6 +1,6 @@
 {
   "name": "error_pattern",
-  "state_width": 8,
+  "state_width": 9,
   "fields": [
     {"byte": 0, "name": "agent", "values": {"0": "orchestrator", "1": "fixer", "2": "oracle", "3": "explorer", "4": "librarian", "5": "designer", "6": "council"}},
     {"byte": 1, "name": "error_type", "values": {"0": "http", "1": "timeout", "2": "rate_limit", "3": "auth", "4": "parse", "5": "timeout", "6": "unknown"}},
@@ -9,6 +9,7 @@
     {"byte": 4, "name": "http_code", "values": {}},
     {"byte": 5, "name": "duration_bucket", "values": {"0": "<1s", "1": "1-5s", "2": "5-30s", "3": "30-120s", "4": ">120s"}},
     {"byte": 6, "name": "recovery", "values": {"0": "none", "1": "retry_ok", "2": "fallback", "3": "abort"}},
-    {"byte": 7, "name": "flags", "values": {"0": "none", "1": "correlated", "2": "new_pattern", "4": "escalated"}}
+    {"byte": 7, "name": "flags", "values": {"0": "none", "1": "correlated", "2": "new_pattern", "4": "escalated"}},
+    {"byte": 8, "name": "project", "values": {"0": "global", "1": "kronos", "2": "pm-adapter", "3": "rag-pubmed", "4": "deers-rock", "5": "other"}}
   ]
 }

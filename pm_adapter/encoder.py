@@ -10,19 +10,33 @@ Usage:
     frame = encode_tool_call(
         agent="fixer", tool="write", outcome="ok",
         duration_bucket="1-5s", size_bucket="10-100KB",
-        tokens_in=120, tokens_out=45, flags="none"
+        tokens_in=120, tokens_out=45, flags="none",
+        project="kronos"
     )
     # frame is a morse string: "··· −−− ·−· ..."
 """
 
 import json
+import os
+import time
+import datetime
 from pathlib import Path
 from typing import Any
 
 _SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"
+_LOG_DIR = Path(os.path.expanduser("~/.config/opencode/pm1-logs"))
 
 # Reverse lookup: label -> byte value for each schema field
 _schema_cache: dict[str, dict] = {}
+
+# Project name -> byte mapping
+PROJECT_MAP = {
+    "global": 0, "kronos": 1, "pm-adapter": 2,
+    "rag-pubmed": 3, "deers-rock": 4, "other": 5,
+}
+
+# Log retention
+DEFAULT_KEEP_DAYS = 7
 
 
 def _load_schema(name: str) -> dict:
@@ -97,6 +111,42 @@ def encode_record(schema_name: str, values: dict) -> str:
     return _bytes_to_morse(frame_bytes)
 
 
+def prune_logs(keep_days: int = DEFAULT_KEEP_DAYS):
+    """Delete pm1-logs older than keep_days days."""
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    cutoff = time.time() - (keep_days * 86400)
+    pruned = 0
+    for f in _LOG_DIR.glob("*.jsonl"):
+        if f.stat().st_mtime < cutoff:
+            f.unlink()
+            pruned += 1
+    return pruned
+
+
+def detect_project() -> str:
+    """Auto-detect project from CWD or environment.
+
+    Checks:
+    1. PM_PROJECT env var
+    2. CWD path for known project names
+    3. Falls back to "global"
+    """
+    env_project = os.environ.get("PM_PROJECT", "")
+    if env_project and env_project in PROJECT_MAP:
+        return env_project
+
+    cwd = os.getcwd().lower()
+    if "kronos" in cwd:
+        return "kronos"
+    elif "pm-adapter" in cwd:
+        return "pm-adapter"
+    elif "rag-pubmed" in cwd:
+        return "rag-pubmed"
+    elif "deers-rock" in cwd:
+        return "deers-rock"
+    return "global"
+
+
 # Convenience functions for each schema type
 
 AGENT_MAP = {
@@ -108,13 +158,15 @@ AGENT_MAP = {
 def encode_tool_call(
     agent: str, tool: str, outcome: str,
     duration_bucket: str = "<1s", size_bucket: str = "<1KB",
-    tokens_in: int = 0, tokens_out: int = 0, flags: str = "none"
+    tokens_in: int = 0, tokens_out: int = 0, flags: str = "none",
+    project: str | None = None,
 ) -> str:
     """Encode a tool call result to PM-1 frame."""
     return encode_record("tool_call", {
         "agent": agent, "tool": tool, "outcome": outcome,
         "duration_bucket": duration_bucket, "size_bucket": size_bucket,
         "tokens_in": tokens_in, "tokens_out": tokens_out, "flags": flags,
+        "project": project or detect_project(),
     })
 
 
@@ -122,14 +174,14 @@ def encode_handoff(
     from_agent: str, to_agent: str, reason: str,
     confidence: str = "medium", files_touched: int = 0,
     tokens_used: int = 0, duration_bucket: str = "30s-2m",
-    flags: str = "none"
+    flags: str = "none", project: str | None = None,
 ) -> str:
     """Encode a handoff message to PM-1 frame."""
     return encode_record("handoff", {
         "from_agent": from_agent, "to_agent": to_agent, "reason": reason,
         "confidence": confidence, "files_touched": files_touched,
         "tokens_used": tokens_used, "duration_bucket": duration_bucket,
-        "flags": flags,
+        "flags": flags, "project": project or detect_project(),
     })
 
 
@@ -137,21 +189,22 @@ def encode_error(
     agent: str, error_type: str, severity: str = "error",
     retry_count: int = 0, http_code: int = 0,
     duration_bucket: str = "<1s", recovery: str = "none",
-    flags: str = "none"
+    flags: str = "none", project: str | None = None,
 ) -> str:
     """Encode an error pattern to PM-1 frame."""
     return encode_record("error_pattern", {
         "agent": agent, "error_type": error_type, "severity": severity,
         "retry_count": retry_count, "http_code": http_code,
         "duration_bucket": duration_bucket, "recovery": recovery,
-        "flags": flags,
+        "flags": flags, "project": project or detect_project(),
     })
 
 
 def encode_cost(
     agent: str, model_tier: str, input_bucket: str, output_bucket: str,
     cost_bucket: str, duration_bucket: str = "<5s",
-    task_count: int = 1, flags: str = "none"
+    task_count: int = 1, flags: str = "none",
+    project: str | None = None,
 ) -> str:
     """Encode a cost log entry to PM-1 frame."""
     return encode_record("cost_log", {
@@ -159,6 +212,7 @@ def encode_cost(
         "input_bucket": input_bucket, "output_bucket": output_bucket,
         "cost_bucket": cost_bucket, "duration_bucket": duration_bucket,
         "task_count": task_count, "flags": flags,
+        "project": project or detect_project(),
     })
 
 

@@ -1,6 +1,6 @@
 {
   "name": "handoff_message",
-  "state_width": 8,
+  "state_width": 9,
   "fields": [
     {"byte": 0, "name": "from_agent", "values": {"0": "orchestrator", "1": "fixer", "2": "oracle", "3": "explorer", "4": "librarian", "5": "designer", "6": "council"}},
     {"byte": 1, "name": "to_agent", "values": {"0": "orchestrator", "1": "fixer", "2": "oracle", "3": "explorer", "4": "librarian", "5": "designer", "6": "council"}},
@@ -9,6 +9,7 @@
     {"byte": 4, "name": "files_touched", "values": {}},
     {"byte": 5, "name": "tokens_used", "values": {}},
     {"byte": 6, "name": "duration_bucket", "values": {"0": "<30s", "1": "30s-2m", "2": "2-10m", "3": "10-30m", "4": ">30m"}},
-    {"byte": 7, "name": "flags", "values": {"0": "none", "1": "has_artifacts", "2": "needs_context", "4": "urgent"}}
+    {"byte": 7, "name": "flags", "values": {"0": "none", "1": "has_artifacts", "2": "needs_context", "4": "urgent"}},
+    {"byte": 8, "name": "project", "values": {"0": "global", "1": "kronos", "2": "pm-adapter", "3": "rag-pubmed", "4": "deers-rock", "5": "other"}}
   ]
 }
