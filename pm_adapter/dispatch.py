@@ -73,12 +73,13 @@ def dispatch_worker(
     model: str | None = None,
     session_id: str = "",
     context_extra: str = "",
+    files: list[str] | None = None,
 ) -> WorkerResult:
     """Dispatch a task to a worker with full PM-1 event lifecycle.
 
     1. Record handoff event
-    2. Assemble context (decisions + project state + task)
-    3. Dispatch via run_agent.py (proven path)
+    2. Assemble context (decisions + project state + files + task)
+    3. Dispatch via direct API
     4. Record completion event
     5. Return structured result
     """
@@ -94,13 +95,14 @@ def dispatch_worker(
             "to": agent,
             "task": task_spec,
             "project": project,
+            "files": files or [],
         })
         events_count += 1
     except Exception:
         pass  # Non-fatal: event logging failure shouldn't block dispatch
 
     # --- 2. Assemble context packet ---
-    context = _assemble_context(project, task_spec, context_extra)
+    context = _assemble_context(project, task_spec, context_extra, files)
 
     # --- 3. Dispatch via direct API (proven path) ---
     resolved_model = model or MODEL_MAP.get(agent, "openai/gpt-5.6-luna")
@@ -168,8 +170,9 @@ def dispatch_worker(
 # --- Helpers (internal) ---
 
 
-def _assemble_context(project: str, task_spec: str, extra: str = "") -> str:
-    """Auto-assemble context packet: project state + decisions + task."""
+def _assemble_context(project: str, task_spec: str, extra: str = "",
+                      files: list[str] | None = None) -> str:
+    """Auto-assemble context packet: project state + decisions + files + task."""
     parts = [f"## Project: {project}"]
 
     # Relevant decisions
@@ -183,6 +186,24 @@ def _assemble_context(project: str, task_spec: str, extra: str = "") -> str:
                 parts.append(f"- [{d['id']}] {d['decision']}")
     except Exception:
         pass
+
+    # File contents — the missing source
+    if files:
+        parts.append("### Relevant Files")
+        for fpath in files:
+            try:
+                p = Path(fpath)
+                if p.exists() and p.is_file():
+                    content = p.read_text(encoding="utf-8", errors="replace")
+                    # Truncate huge files: include first 200 + last 50 lines
+                    lines = content.splitlines()
+                    if len(lines) > 250:
+                        truncated = "\n".join(lines[:200]) + f"\n... ({len(lines)-250} lines omitted) ...\n" + "\n".join(lines[-50:])
+                        parts.append(f"\n**{p.name}** ({len(lines)} lines, truncated):\n```\n{truncated}\n```")
+                    else:
+                        parts.append(f"\n**{p.name}** ({len(lines)} lines):\n```\n{content}\n```")
+            except Exception:
+                pass  # Skip unreadable files
 
     # Extra context
     if extra:
