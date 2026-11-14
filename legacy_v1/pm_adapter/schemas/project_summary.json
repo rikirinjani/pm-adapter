@@ -1,0 +1,16 @@
+{
+  "name": "project_summary",
+  "state_width": 10,
+  "fields": [
+    {"byte": 0, "name": "project", "values": {"0": "global", "1": "kronos", "2": "pm-adapter", "3": "rag-pubmed", "4": "deers-rock", "5": "other"}},
+    {"byte": 1, "name": "total_sessions", "values": {}},
+    {"byte": 2, "name": "total_tasks", "values": {}},
+    {"byte": 3, "name": "total_errors", "values": {}},
+    {"byte": 4, "name": "error_rate_bucket", "values": {"0": "lt_5pct", "1": "5_20pct", "2": "20_50pct", "3": "gt_50pct"}},
+    {"byte": 5, "name": "total_cost_bucket", "values": {"0": "lt_10c", "1": "10c_50c", "2": "50c_2d", "3": "2d_10d", "4": "gt_10d"}},
+    {"byte": 6, "name": "dominant_pattern", "values": {"0": "none", "1": "rate_limit", "2": "timeout", "3": "auth", "4": "http", "5": "other"}},
+    {"byte": 7, "name": "health", "values": {"0": "healthy", "1": "degraded", "2": "unhealthy", "3": "critical"}},
+    {"byte": 8, "name": "last_session_outcome", "values": {"0": "success", "1": "partial", "2": "failed"}},
+    {"byte": 9, "name": "flags", "values": {"0": "none", "1": "needs_attention", "2": "pattern_escalating", "4": "new_project"}}
+  ]
+}

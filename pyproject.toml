@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pm-adapter"
-version = "1.0.0"
-description = "Reference adapter for Pro Memoria — schema-driven PM-1 frame expansion"
+version = "2.0.0"
+description = "PM-Adapter v2: schema-driven, deterministic, zero-LLM-call state ownership for harnesses (packet validation, event log, derived state, keyed vault, match step, packet assembly); the original Morse frame decoder lives in pm_adapter.legacy"
 requires-python = ">=3.8"
-dependencies = ["pro-memoria @ git+https://github.com/rikirinjani/pro-memoria.git"]
+dependencies = []                       # standard library only
 
 [project.optional-dependencies]
-test = ["pytest"]
+legacy = ["pro-memoria @ git+https://github.com/rikirinjani/pro-memoria.git"]      # only for decoding Morse frames (pm_adapter.legacy)
 
 [tool.setuptools.packages.find]
 where = ["."]

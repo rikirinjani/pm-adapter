@@ -1,0 +1,17 @@
+{
+  "name": "decision",
+  "fields": [
+    {"name": "id", "type": "string", "description": "DEC-YYYY-NNNN unique identifier"},
+    {"name": "decision", "type": "string", "description": "What was decided (short, 1-2 sentences)"},
+    {"name": "rationale", "type": "string", "description": "Why this decision was made"},
+    {"name": "scope", "type": "string", "description": "Project this applies to"},
+    {"name": "tags", "type": "array", "description": "Classification tags: architectural, operational, constraint, rejected"},
+    {"name": "status", "type": "string", "description": "active, superseded, rejected"},
+    {"name": "supersedes", "type": "string", "description": "ID of decision this replaces (if any)"},
+    {"name": "session_id", "type": "string", "description": "Session that created this decision"},
+    {"name": "task_summary", "type": "string", "description": "Brief description of the task that produced this decision"},
+    {"name": "created_at", "type": "string", "description": "ISO timestamp"},
+    {"name": "domain", "type": "string", "description": "Domain for relevance filtering: architecture, data, infra, ui, security"}
+  ],
+  "storage": "JSONL file, one decision per line, append-only"
+}
