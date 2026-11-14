@@ -1,4 +1,4 @@
-"""PM-Adapter v2: schema-driven, deterministic, zero LLM calls; the adapter owns the state (see README.md and SPEC.md).
+"""PM-Adapter v2: schema-driven, deterministic, zero LLM calls; the adapter owns the state (see README.md and docs/SPEC_V2.md).
 
 The original public names keep working: ``Adapter``, ``load_schema``, ``to_english``, ``to_json``, ``to_semantic``, ``to_events``.
 The Morse frame decoder lives in ``pm_adapter.legacy`` and needs the optional ``pro-memoria`` package only when frames are decoded.

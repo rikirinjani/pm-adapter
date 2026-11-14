@@ -5,8 +5,7 @@ The packet holds the derived value, never the raw input it came from. Each funct
 (for example ``{"hop": 55}``); a function must not read anything else, so the same log always gives the same value.
 
 Shipped example: ``freeze_active``, "a freeze window is active at this hop", computed from ``notice`` events of kind "freeze"
-({"kind": "freeze", "from_hop": 50, "to_hop": 60}). Unpublished discovery notes, T3: a raw schedule pinned in the packet led to violations in 8 of 12
-episodes; the derived field gave 0 of 12.
+({"kind": "freeze", "from_hop": 50, "to_hop": 60}). In the author's runs a raw schedule pinned in the packet led to violations; the derived field did not.
 """
 from __future__ import annotations
 

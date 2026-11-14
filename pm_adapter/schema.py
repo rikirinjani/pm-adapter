@@ -2,7 +2,7 @@
 
 Roles
     decision   goes into the packet (the packet holds the derived or validated value)
-    transient  validated and logged, never placed in the packet (unpublished discovery notes, T2: such a field changed 0.4 percent of decisions)
+    transient  validated and logged, never placed in the packet (in the author's runs such a field, although large, hardly changed the decisions)
     invariant  fixed by the schema (``const``); lives in the task specification, which the packet only references
 
 A schema is plain JSON. Bundled schemas (``load_schema``) include the original frame schemas used by ``pm_adapter.legacy``.

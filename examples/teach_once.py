@@ -1,4 +1,4 @@
-"""Teach-once walk-through (SPEC section 5). Standard library only, no model call, no network.
+"""Teach-once walk-through (docs/SPEC_V2.md, section 5). Standard library only, no model call, no network.
 
     python examples/teach_once.py          (from the repository root; its printed output is saved in teach_once_output.txt)
 

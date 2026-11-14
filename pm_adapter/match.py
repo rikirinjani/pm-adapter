@@ -4,13 +4,10 @@ This module imports no model client and makes no network call. It never repairs,
 
 * The answer is accepted only if it is exactly one existing entry name (R17). An empty reply, a reply cut at the token limit, the word
   "none", an unknown name, or a reply naming more than one line all mean that no rule is delivered.
-* The caller must pass the token limit for the model call; there is no default (R18). Measured reply lengths of the reference model
-  (deepseek-v4.1-flash, one match call over 100 look-alike lines, unpublished discovery notes, E2-S arm 1 rerun): median about 2,100 tokens,
-  first attempts up to the 16,000-token limit used there, finished replies up to about 12,000. Three earlier runs lost whole arms to a limit
-  set too low (unpublished discovery notes, sections 13, 15, 16). The measured values belong to one model on one task family: measure your own.
-* A "none" answer is NOT reliable (R20). When no line applied, the model named a line anyway in most finished calls: in the E2-S rerun
-  chunk calls, 1 real "none" in 83 finished calls; in the shortlist calls, 6 in 16 (unpublished discovery notes, section 16). Do not build a design that
-  relies on "none" to filter a long list.
+* The caller must set the token limit for the model call; there is no default (R18). Reply length depends on the model and on the
+  number of lines; measure it at your real input size before setting the limit. In the author's runs, limits set too low cost whole runs.
+* A "none" answer is NOT reliable (R20). In the author's runs, when no line applied the model named a line anyway in most finished
+  calls. Do not build a design that relies on "none" to filter a long list.
 """
 from __future__ import annotations
 

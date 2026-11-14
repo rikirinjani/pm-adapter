@@ -22,7 +22,7 @@ from .packet import DEFAULT_BUDGET_CHARS, Packet, check_budget, delivered_item
 from .schema import Schema, check_evidence, is_legacy_schema
 from .store import CONFIRMED, SUPERSEDED, UNVERIFIED, Entry, EntryFold, current
 
-DEFAULT_TABLE_LIMIT = 24                 # R13: lines offered to the match step; tested with 12 distinct rules in a table of up to 23 lines (unpublished discovery notes, sections 14 and 19)
+DEFAULT_TABLE_LIMIT = 24                 # R13: lines offered to the match step; the range the author tested with a small rule set; beyond it retrieval carries a flag
 OUTSIDE_TESTED_RANGE = "outside_tested_range"
 
 
@@ -289,8 +289,8 @@ class Adapter:
         raise TypeError("to_events takes nothing, a frame string or a mapping")
 
     def to_semantic(self, x):
-        """Kept for compatibility: a dense text description. NOT recommended for retrieval: similarity retrieval delivered 10, 6 and 0 of 12 as
-        the store grew, and 15 of 36 with a paraphrased key (unpublished discovery notes, sections 8 and 13). Retrieve by key (``retrieve``) instead."""
+        """Kept for compatibility: a dense text description. NOT recommended for retrieval: in the author's runs similarity retrieval lost the
+        rule as the store grew and did not bridge a paraphrased key. Retrieve by key (``retrieve``) instead."""
         if isinstance(x, str):
             return self._legacy.to_semantic(x)
         if isinstance(x, Mapping):
