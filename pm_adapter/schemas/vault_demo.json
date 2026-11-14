@@ -1,0 +1,12 @@
+{
+  "name": "vault_demo",
+  "task_spec_ref": "task-spec-v1",
+  "fields": [
+    {"name": "phase", "type": "enum", "values": ["idle", "think", "act", "review"], "role": "decision"},
+    {"name": "outcome", "type": "enum", "values": ["running", "pass", "fail"], "role": "decision"},
+    {"name": "freeze_active", "type": "bool", "role": "decision", "derived": "freeze_active"},
+    {"name": "log_tail", "type": "str", "role": "transient"},
+    {"name": "task_spec", "type": "str", "role": "invariant", "const": "task-spec-v1"}
+  ],
+  "keys": ["off", "scale", "mod", "fdiv", "cap", "markup", "ge", "xor", "rsub", "sqadd", "shift", "fmult"]
+}

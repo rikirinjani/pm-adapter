@@ -1,0 +1,81 @@
+
+== 1. event log so far
+[[1, "state_init", "agent", "claimed"], [2, "state_init", "agent", "claimed"], [3, "notice", "scheduler", "claimed"]]
+
+== 2. stored, not yet retrievable
+{
+  "entry": "r4",
+  "retrievable_by_key": [],
+  "status": "unverified"
+}
+
+== 3. confirmed
+{
+  "confirmed_seq": 5,
+  "entry": "r4",
+  "evidence": "test.mod_01.pass",
+  "provenance": "measured",
+  "status": "confirmed",
+  "write_seq": 4
+}
+
+== 4. retrieval by key
+[["mod", "return x % 13", "confirmed"]]
+
+== 5a. packet (json)
+{
+  "decision": {
+    "freeze_active": {
+      "events": [
+        3
+      ],
+      "function": "freeze_active",
+      "provenance": "derived",
+      "value": true
+    },
+    "outcome": {
+      "evidence": null,
+      "provenance": "claimed",
+      "seq": 2,
+      "value": "running"
+    },
+    "phase": {
+      "evidence": null,
+      "provenance": "claimed",
+      "seq": 1,
+      "value": "act"
+    }
+  },
+  "hop": 55,
+  "missing": [],
+  "store": [
+    {
+      "applies_to": "lib/mod_02.py",
+      "evidence": "test.mod_01.pass",
+      "key": "mod",
+      "provenance": "measured",
+      "seq": 4,
+      "status": "confirmed",
+      "tag": "[confirmed by test.mod_01.pass at seq 5]",
+      "text": "return x % 13"
+    }
+  ],
+  "target": "lib/mod_02.py",
+  "task_spec": "task-spec-v1"
+}
+
+== 5b. packet (english)
+Task specification: task-spec-v1. Target: lib/mod_02.py at hop 55. phase is act, claimed (no measurement behind it). outcome is running, claimed (no measurement behind it). freeze_active is True, derived by freeze_active from events [3]. Rule mod applies to lib/mod_02.py: return x % 13 [confirmed by test.mod_01.pass at seq 5].
+
+freeze_active at hop 70 (outside the window): False
+
+== 6a. retrieval by key after the new rule
+[["mod", "return x % 7", "confirmed"]]
+
+== 6b. audit view: every entry with its status
+[["r4", "return x % 13", "superseded", null, "r6"], ["r6", "return x % 7", "confirmed", "r4", null]]
+
+== 6c. the log keeps the old rule's events
+[[4, "rule_stored", "r4"], [5, "rule_confirmed", "r4"], [6, "rule_stored", "r6"], [7, "rule_confirmed", "r6"], [8, "rule_superseded", "r4"]]
+
+superseded entry returned by retrieval: False
